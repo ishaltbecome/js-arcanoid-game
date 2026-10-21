@@ -33,11 +33,26 @@ class Paddle {
 class Ball {
     constructor() {
         this.radius = 10;
+        this.color = 'ff3366';
+        this.baseSpeed = 6;
+
+        this.reset();
+    }
+
+    reset() {
         this.x = canvas.width / 2;
         this.y = canvas.height - 50;
-        this.color = 'ff3366';
-        this.dx = 5;
-        this.dy = -5;
+        this.dx = 0;
+        this.dy = 0;
+        this.isStuck = true;
+    }
+
+    launch() {
+        if (this.isStuck) {
+            this.isStuck = false;
+            this.dx = (Math.random() * 4 - 2);
+            this.dy = -this.baseSpeed;
+        }
     }
 
     draw() {
@@ -48,7 +63,13 @@ class Ball {
         ctx.fill();
     }
 
-    update() {
+    update(aPaddle) {
+        if (this.isStuck) {
+            this.x = aPaddle.x + aPaddle.width / 2;
+            this.y = aPaddle.y - this.radius;
+            return; // Выходим из метода, физику полета и отскоков не считаем
+        }
+
         this.x += this.dx;
         this.y += this.dy;
 
@@ -56,25 +77,57 @@ class Ball {
             this.dx *= -1;
         }
 
-        if (this.y + this.radius > canvas.height || this.y - this.radius < 0) {
+        if (this.y - this.radius < 0) {
             this.dy *= -1;
         }
+
+        if (this.y - this.radius > canvas.height) {
+            this.reset();
+        }
+
+        // ==========================================
+        // КОЛЛИЗИЯ С ПЛАТФОРМОЙ
+        // ==========================================
+
+        if (
+            this.y + this.radius >= aPaddle.y &&                // 1. Мяч не улетел выше верха платформы
+            this.y - this.radius <= aPaddle.y + aPaddle.height && // 2. Мяч не улетел ниже дна платформы
+            this.x + this.radius >= aPaddle.x &&               // 3. Мяч правее левого края платформы
+            this.x - this.radius <= aPaddle.x + aPaddle.width     // 4. Мяч левее правого края платформы
+        ) {
+            let hitPosition = this.x - aPaddle.x;
+            let relativeHit = (hitPosition / aPaddle.width) * 2 - 1;
+
+            this.dx = relativeHit * this.baseSpeed;
+            this.dy = -Math.sqrt(Math.abs(this.baseSpeed * this.baseSpeed - this.dx * this.dx));
+
+            if (Math.abs(this.dy) < 2) {
+                this.dy = -2;
+            }
+
+            this.y = aPaddle.y - this.radius;
+        }
+
     }
 }
-
 
 const paddle = new Paddle();
 const ball = new Ball();
 
 canvas.addEventListener('mousemove', event => {
-    paddle.move(event.offsetX);
+    const realtiveX = event.clientX - canvas.getBoundingClientRect().left;
+    paddle.move(realtiveX);
+});
+
+window.addEventListener('click', () => {
+    ball.launch();
 });
 
 function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     paddle.draw();
     ball.draw();
-    ball.update();
+    ball.update(paddle);
     requestAnimationFrame(gameLoop);
 }
 
