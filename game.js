@@ -111,8 +111,60 @@ class Ball {
     }
 }
 
+class Brick {
+    constructor(x, y, width, height, color) {
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+        this.color = color;
+        this.isDestroyed = false;
+    }
+
+    draw(ctx) {
+        if (!this.isDestroyed) {
+            ctx.fillStyle = this.color;
+            ctx.fillRect(this.x, this.y, this.width, this.height);
+
+            // Добавим легкую обводку, чтобы кирпичи смотрелись объемнее
+            ctx.strokeStyle = '#111';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(this.x, this.y, this.width, this.height);
+        }
+    }
+}
+
 const paddle = new Paddle();
 const ball = new Ball();
+
+// Настройки сетки кирпичей
+const brickRows = 5;       // Количество строк
+const brickCols = 8;       // Количество колонок
+const brickPadding = 10;   // Отступ между кирпичами
+const brickOffsetTop = 50; // Отступ от верхнего края canvas
+const brickOffsetLeft = 35;// Отступ от левого края canvas
+
+// Автоматически вычисляем ширину кирпича, чтобы сетка ровно влезла в экран 800px
+const brickWidth = (canvas.width - (brickOffsetLeft * 2) - (brickPadding * (brickCols - 1))) / brickCols;
+const brickHeight = 25;    // Высота кирпича
+
+// Массив цветов для каждого ряда (сверху вниз)
+const rowColors = ['#ff3333', '#ff9933', '#ffff33', '#33ff33', '#3399ff'];
+
+const bricks = [];
+
+// Двойной цикл для заполнения сетки
+for (let r = 0; r < brickRows; r++) {
+    for (let c = 0; c < brickCols; c++) {
+        // Вычисляем координаты X и Y для каждого конкретного кирпича
+        let brickX = c * (brickWidth + brickPadding) + brickOffsetLeft;
+        let brickY = r * (brickHeight + brickPadding) + brickOffsetTop;
+
+        // Создаем новый кирпич и кладем его в массив
+        bricks.push(new Brick(brickX, brickY, brickWidth, brickHeight, rowColors[r]));
+    }
+}
+
 
 canvas.addEventListener('mousemove', event => {
     const realtiveX = event.clientX - canvas.getBoundingClientRect().left;
@@ -123,11 +175,33 @@ window.addEventListener('click', () => {
     ball.launch();
 });
 
+function checkBrickCollisions() {
+    bricks.forEach(brick => {
+        // Проверяем коллизию только для тех кирпичей, которые ЕЩЕ НЕ разрушены
+        if (!brick.isDestroyed) {
+            if (
+                ball.y + ball.radius >= brick.y &&               // Мяч ниже верхней границы кирпича
+                ball.y - ball.radius <= brick.y + brick.height && // Мяч выше нижней границы кирпича
+                ball.x + ball.radius >= brick.x &&               // Мяч правее левой границы кирпича
+                ball.x - ball.radius <= brick.x + brick.width     // Мяч левее правой границы кирпича
+            ) {
+                // Разворачиваем мяч по вертикали
+                ball.dy *= -1;
+
+                // Помечаем кирпич как уничтоженный
+                brick.isDestroyed = true;
+            }
+        }
+    });
+}
+
 function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     paddle.draw();
     ball.draw();
     ball.update(paddle);
+    checkBrickCollisions();
+    bricks.forEach(brick => brick.draw(ctx));
     requestAnimationFrame(gameLoop);
 }
 
